@@ -9,14 +9,14 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-LLM_PROVIDER = os.getenv("LLM_PROVIDER", "anthropic")
-LLM_MODEL = os.getenv("LLM_MODEL", "claude-sonnet-4-5")
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "gemini")
+LLM_MODEL = os.getenv("LLM_MODEL", "gemini-2.5-flash")
 
 
 def get_llm():
-    if LLM_PROVIDER == "anthropic":
-        from langchain_anthropic import ChatAnthropic
+    if LLM_PROVIDER == "gemini":
+        from langchain_google_genai import ChatGoogleGenerativeAI
 
-        return ChatAnthropic(model=LLM_MODEL, temperature=0)
+        return ChatGoogleGenerativeAI(model=LLM_MODEL, temperature=0)
 
     raise ValueError(f"Proveedor de LLM no soportado: {LLM_PROVIDER}")
