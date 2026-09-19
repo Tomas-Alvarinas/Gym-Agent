@@ -1,8 +1,5 @@
-"""Interfaz de chat por terminal para Gym Agent.
+"""Interfaz de chat por terminal para Gym Agent."""
 
-Mantiene el historial de mensajes en memoria durante la sesión
-(sin persistencia todavía: eso llega con la memoria/estado persistente).
-"""
 from agent.graph import build_graph
 
 
@@ -22,11 +19,13 @@ def extract_text(message) -> str:
 
     if isinstance(content, list):
         parts = []
+
         for block in content:
             if isinstance(block, str):
                 parts.append(block)
             elif isinstance(block, dict) and block.get("type") == "text":
                 parts.append(block.get("text", ""))
+
         return "".join(parts)
 
     return str(content)
@@ -36,20 +35,24 @@ def main():
     graph = build_graph()
     messages = []
 
-    print("Gym Agent (V1). Escribi 'salir' para terminar.\n")
+    print("Gym Agent (V2). Escribi 'salir' para terminar.\n")
 
     while True:
         user_input = input("Vos: ").strip()
+
         if user_input.lower() in {"salir", "exit", "quit"}:
             break
+
         if not user_input:
             continue
 
         messages.append(("user", user_input))
+
         result = graph.invoke({"messages": messages})
         messages = result["messages"]
 
         last_message = messages[-1]
+
         print(f"Gym Agent: {extract_text(last_message)}\n")
 
 
