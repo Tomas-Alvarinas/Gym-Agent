@@ -18,7 +18,7 @@ def _with_temp_db(test_fn):
             test_fn()
 
 
-def test_log_exercise_valid_multiple_sets():
+def test_log_exercise_valid_exact_values():
     from tools.exercise_tools import log_exercise
 
     result = log_exercise.invoke(
@@ -32,9 +32,10 @@ def test_log_exercise_valid_multiple_sets():
         }
     )
     assert "Registrado: Press banca" in result
-    assert "80.0 kg x 10" in result
-    assert "85.0 kg x 8" in result
-    assert "90.0 kg x 6" in result
+    assert "80.0 kg, 10 reps" in result
+    assert "85.0 kg, 8 reps" in result
+    assert "90.0 kg, 6 reps" in result
+    assert "~" not in result
 
 
 def test_log_exercise_valid_without_weight():
@@ -46,11 +47,59 @@ def test_log_exercise_valid_without_weight():
             "sets": [{"reps": 15}, {"reps": 12}, {"reps": 10}],
         }
     )
-    assert "Registrado: Flexiones" in result
-    assert "15 reps" in result
-    assert "12 reps" in result
-    assert "10 reps" in result
-    assert "kg" not in result
+    assert "peso desconocido, 15 reps" in result
+    assert "peso desconocido, 12 reps" in result
+    assert "peso desconocido, 10 reps" in result
+
+
+def test_log_exercise_fully_unknown_sets():
+    from tools.exercise_tools import log_exercise
+
+    result = log_exercise.invoke(
+        {
+            "exercise": "Press militar",
+            "sets": [{}, {}, {}],
+        }
+    )
+    assert "Registrado: Press militar" in result
+    assert result.count("peso desconocido, reps desconocidas") == 3
+
+
+def test_log_exercise_estimated_weight_and_reps():
+    from tools.exercise_tools import log_exercise
+
+    result = log_exercise.invoke(
+        {
+            "exercise": "Sentadilla",
+            "sets": [
+                {
+                    "weight_kg": 80,
+                    "weight_is_estimated": True,
+                    "reps": 10,
+                    "reps_is_estimated": False,
+                }
+            ],
+        }
+    )
+    assert "~80.0 kg, 10 reps" in result
+
+
+def test_log_exercise_mixed_estimation_across_sets():
+    from tools.exercise_tools import log_exercise
+
+    result = log_exercise.invoke(
+        {
+            "exercise": "Peso muerto",
+            "sets": [
+                {"weight_kg": 100, "reps": 5},
+                {"weight_kg": 100, "weight_is_estimated": True, "reps": 5, "reps_is_estimated": True},
+                {"reps": 4},
+            ],
+        }
+    )
+    assert "100.0 kg, 5 reps" in result
+    assert "~100.0 kg, ~5 reps" in result
+    assert "peso desconocido, 4 reps" in result
 
 
 def test_log_exercise_missing_name():
@@ -72,10 +121,7 @@ def test_log_exercise_invalid_reps_in_one_set():
     from tools.exercise_tools import log_exercise
 
     result = log_exercise.invoke(
-        {
-            "exercise": "Sentadilla",
-            "sets": [{"reps": 10}, {"reps": 0}],
-        }
+        {"exercise": "Sentadilla", "sets": [{"reps": 10}, {"reps": 0}]}
     )
     assert "No se pudo registrar" in result
     assert "serie 2" in result
@@ -94,6 +140,34 @@ def test_log_exercise_negative_weight_in_one_set():
     assert "serie 2" in result
 
 
+def test_log_exercise_reps_estimated_without_value_is_rejected():
+    from tools.exercise_tools import log_exercise
+
+    result = log_exercise.invoke(
+        {
+            "exercise": "Sentadilla",
+            "sets": [{"reps": None, "reps_is_estimated": True}],
+        }
+    )
+    assert "No se pudo registrar" in result
+    assert "reps" in result
+    assert "estimado" in result
+
+
+def test_log_exercise_weight_estimated_without_value_is_rejected():
+    from tools.exercise_tools import log_exercise
+
+    result = log_exercise.invoke(
+        {
+            "exercise": "Sentadilla",
+            "sets": [{"reps": 8, "weight_kg": None, "weight_is_estimated": True}],
+        }
+    )
+    assert "No se pudo registrar" in result
+    assert "weight_kg" in result
+    assert "estimado" in result
+
+
 def test_get_exercise_history_empty():
     from tools.exercise_tools import get_exercise_history
 
@@ -101,7 +175,7 @@ def test_get_exercise_history_empty():
     assert "No hay registros" in result
 
 
-def test_get_exercise_history_after_logging():
+def test_get_exercise_history_preserves_exact_estimated_unknown():
     from tools.exercise_tools import get_exercise_history, log_exercise
 
     log_exercise.invoke(
@@ -109,14 +183,15 @@ def test_get_exercise_history_after_logging():
             "exercise": "Curl de biceps",
             "sets": [
                 {"weight_kg": 12, "reps": 10},
-                {"weight_kg": 12, "reps": 10},
-                {"weight_kg": 12, "reps": 8},
+                {"weight_kg": 12, "weight_is_estimated": True, "reps": 10},
+                {"reps": None, "weight_kg": None},
             ],
         }
     )
     result = get_exercise_history.invoke({"exercise": "Curl de biceps"})
-    assert "Historial de Curl de biceps" in result
-    assert "12.0 kg x 10, 12.0 kg x 10, 12.0 kg x 8" in result
+    assert "12.0 kg, 10 reps" in result
+    assert "~12.0 kg, 10 reps" in result
+    assert "peso desconocido, reps desconocidas" in result
 
 
 def test_get_exercise_history_is_case_insensitive():
@@ -133,7 +208,11 @@ def test_get_exercise_history_multiple_sessions_ordered_desc():
 
     # Sesion mas vieja insertada directamente en la capa de datos para
     # simular una fecha anterior (log_exercise siempre usa "hoy").
-    insert_exercise_log("Remo", [{"reps": 10, "weight_kg": 40}], "2020-01-01")
+    insert_exercise_log(
+        "Remo",
+        [{"reps": 10, "reps_is_estimated": False, "weight_kg": 40, "weight_is_estimated": False}],
+        "2020-01-01",
+    )
     log_exercise.invoke({"exercise": "Remo", "sets": [{"reps": 10, "weight_kg": 50}]})
 
     result = get_exercise_history.invoke({"exercise": "Remo"})
@@ -145,14 +224,19 @@ def test_get_exercise_history_multiple_sessions_ordered_desc():
 
 if __name__ == "__main__":
     tests = [
-        test_log_exercise_valid_multiple_sets,
+        test_log_exercise_valid_exact_values,
         test_log_exercise_valid_without_weight,
+        test_log_exercise_fully_unknown_sets,
+        test_log_exercise_estimated_weight_and_reps,
+        test_log_exercise_mixed_estimation_across_sets,
         test_log_exercise_missing_name,
         test_log_exercise_empty_sets,
         test_log_exercise_invalid_reps_in_one_set,
         test_log_exercise_negative_weight_in_one_set,
+        test_log_exercise_reps_estimated_without_value_is_rejected,
+        test_log_exercise_weight_estimated_without_value_is_rejected,
         test_get_exercise_history_empty,
-        test_get_exercise_history_after_logging,
+        test_get_exercise_history_preserves_exact_estimated_unknown,
         test_get_exercise_history_is_case_insensitive,
         test_get_exercise_history_multiple_sessions_ordered_desc,
     ]
