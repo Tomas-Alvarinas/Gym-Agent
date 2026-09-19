@@ -15,7 +15,11 @@ def insert_exercise_log(
     date: str,
     db_path: Path | None = None,
 ) -> int:
-    """sets: lista de {"reps": int, "weight_kg": float | None}, en orden."""
+    """sets: lista de
+    {"reps": int | None, "reps_is_estimated": bool,
+     "weight_kg": float | None, "weight_is_estimated": bool},
+    en orden.
+    """
     conn = get_connection(db_path)
     try:
         cursor = conn.execute(
@@ -25,10 +29,18 @@ def insert_exercise_log(
         session_id = cursor.lastrowid
 
         conn.executemany(
-            "INSERT INTO exercise_sets (session_id, set_order, reps, weight_kg) "
-            "VALUES (?, ?, ?, ?)",
+            "INSERT INTO exercise_sets "
+            "(session_id, set_order, reps, reps_is_estimated, weight_kg, weight_is_estimated) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
             [
-                (session_id, order, s["reps"], s.get("weight_kg"))
+                (
+                    session_id,
+                    order,
+                    s["reps"],
+                    int(s["reps_is_estimated"]),
+                    s["weight_kg"],
+                    int(s["weight_is_estimated"]),
+                )
                 for order, s in enumerate(sets, start=1)
             ],
         )
@@ -44,7 +56,11 @@ def fetch_exercise_history(
     db_path: Path | None = None,
 ) -> list[dict]:
     """Devuelve una lista de sesiones (mas reciente primero), cada una como
-    {"date": str, "sets": [{"reps": int, "weight_kg": float | None}, ...]}.
+    {"date": str, "sets": [
+        {"reps": int | None, "reps_is_estimated": bool,
+         "weight_kg": float | None, "weight_is_estimated": bool},
+        ...
+    ]}.
     """
     conn = get_connection(db_path)
     try:
@@ -63,14 +79,22 @@ def fetch_exercise_history(
         history = []
         for session in sessions:
             set_rows = conn.execute(
-                "SELECT reps, weight_kg FROM exercise_sets "
-                "WHERE session_id = ? ORDER BY set_order ASC",
+                "SELECT reps, reps_is_estimated, weight_kg, weight_is_estimated "
+                "FROM exercise_sets WHERE session_id = ? ORDER BY set_order ASC",
                 (session["id"],),
             ).fetchall()
             history.append(
                 {
                     "date": session["date"],
-                    "sets": [dict(row) for row in set_rows],
+                    "sets": [
+                        {
+                            "reps": row["reps"],
+                            "reps_is_estimated": bool(row["reps_is_estimated"]),
+                            "weight_kg": row["weight_kg"],
+                            "weight_is_estimated": bool(row["weight_is_estimated"]),
+                        }
+                        for row in set_rows
+                    ],
                 }
             )
         return history

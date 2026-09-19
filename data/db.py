@@ -20,8 +20,10 @@ CREATE TABLE IF NOT EXISTS exercise_sets (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     session_id INTEGER NOT NULL REFERENCES exercise_sessions(id) ON DELETE CASCADE,
     set_order INTEGER NOT NULL,
-    reps INTEGER NOT NULL,
-    weight_kg REAL
+    reps INTEGER,
+    reps_is_estimated INTEGER NOT NULL DEFAULT 0,
+    weight_kg REAL,
+    weight_is_estimated INTEGER NOT NULL DEFAULT 0
 );
 """
 
