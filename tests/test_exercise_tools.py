@@ -1,21 +1,27 @@
 """Pruebas aisladas de log_exercise / get_exercise_history, sin LLM.
 
-Usa una base SQLite temporal (no toca data/gym_agent.db).
-Ejecutar con: python tests/test_exercise_tools.py
+Cada test corre contra una base SQLite temporal propia (fixture autouse
+de pytest): no toca data/gym_agent.db y queda aislado del resto de los
+tests sin importar el orden en que se ejecuten. La fixture la aplica
+pytest automáticamente a cada test_* -- por eso corre igual con
+`pytest` que con `python tests/test_exercise_tools.py` (ver __main__).
 """
 import sys
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 
-def _with_temp_db(test_fn):
+@pytest.fixture(autouse=True)
+def temp_db():
     with tempfile.TemporaryDirectory() as tmp_dir:
         temp_db_path = Path(tmp_dir) / "test_gym_agent.db"
         with patch("data.db.DB_PATH", temp_db_path):
-            test_fn()
+            yield
 
 
 def test_log_exercise_valid_exact_values():
@@ -223,24 +229,6 @@ def test_get_exercise_history_multiple_sessions_ordered_desc():
 
 
 if __name__ == "__main__":
-    tests = [
-        test_log_exercise_valid_exact_values,
-        test_log_exercise_valid_without_weight,
-        test_log_exercise_fully_unknown_sets,
-        test_log_exercise_estimated_weight_and_reps,
-        test_log_exercise_mixed_estimation_across_sets,
-        test_log_exercise_missing_name,
-        test_log_exercise_empty_sets,
-        test_log_exercise_invalid_reps_in_one_set,
-        test_log_exercise_negative_weight_in_one_set,
-        test_log_exercise_reps_estimated_without_value_is_rejected,
-        test_log_exercise_weight_estimated_without_value_is_rejected,
-        test_get_exercise_history_empty,
-        test_get_exercise_history_preserves_exact_estimated_unknown,
-        test_get_exercise_history_is_case_insensitive,
-        test_get_exercise_history_multiple_sessions_ordered_desc,
-    ]
-    for t in tests:
-        _with_temp_db(t)
-        print(f"OK: {t.__name__}")
-    print(f"\n{len(tests)}/{len(tests)} pruebas de exercise_tools pasaron correctamente.")
+    # Delega en pytest para que la fixture autouse se aplique igual que
+    # al correr `python -m pytest`: mismo aislamiento, mismo resultado.
+    raise SystemExit(pytest.main([__file__, "-v"]))
