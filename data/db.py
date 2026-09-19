@@ -10,13 +10,18 @@ from pathlib import Path
 DB_PATH = Path(__file__).parent / "gym_agent.db"
 
 _SCHEMA = """
-CREATE TABLE IF NOT EXISTS exercise_logs (
+CREATE TABLE IF NOT EXISTS exercise_sessions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     exercise TEXT NOT NULL,
-    sets INTEGER NOT NULL,
-    reps INTEGER NOT NULL,
-    weight_kg REAL,
     date TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS exercise_sets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id INTEGER NOT NULL REFERENCES exercise_sessions(id) ON DELETE CASCADE,
+    set_order INTEGER NOT NULL,
+    reps INTEGER NOT NULL,
+    weight_kg REAL
 );
 """
 
@@ -26,5 +31,6 @@ def get_connection(db_path: Path | None = None) -> sqlite3.Connection:
         db_path = DB_PATH
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
-    conn.execute(_SCHEMA)
+    conn.execute("PRAGMA foreign_keys = ON")
+    conn.executescript(_SCHEMA)
     return conn
