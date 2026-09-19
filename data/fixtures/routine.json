@@ -1,0 +1,50 @@
+{
+  "monday": {
+    "focus": "Pecho y triceps",
+    "exercises": [
+      {"name": "Press banca", "sets": 4, "reps": "6-8"},
+      {"name": "Press inclinado mancuernas", "sets": 3, "reps": "8-10"},
+      {"name": "Fondos", "sets": 3, "reps": "10-12"},
+      {"name": "Extension triceps polea", "sets": 3, "reps": "12-15"}
+    ]
+  },
+  "tuesday": {
+    "focus": "Espalda y biceps",
+    "exercises": [
+      {"name": "Dominadas", "sets": 4, "reps": "6-8"},
+      {"name": "Remo con barra", "sets": 4, "reps": "8-10"},
+      {"name": "Jalon al pecho", "sets": 3, "reps": "10-12"},
+      {"name": "Curl biceps barra", "sets": 3, "reps": "10-12"}
+    ]
+  },
+  "wednesday": {
+    "focus": "Descanso",
+    "exercises": []
+  },
+  "thursday": {
+    "focus": "Piernas",
+    "exercises": [
+      {"name": "Sentadilla", "sets": 4, "reps": "6-8"},
+      {"name": "Prensa", "sets": 3, "reps": "10-12"},
+      {"name": "Peso muerto rumano", "sets": 3, "reps": "8-10"},
+      {"name": "Extension cuadriceps", "sets": 3, "reps": "12-15"}
+    ]
+  },
+  "friday": {
+    "focus": "Hombros y core",
+    "exercises": [
+      {"name": "Press militar", "sets": 4, "reps": "6-8"},
+      {"name": "Elevaciones laterales", "sets": 3, "reps": "12-15"},
+      {"name": "Face pull", "sets": 3, "reps": "12-15"},
+      {"name": "Plancha", "sets": 3, "reps": "45s"}
+    ]
+  },
+  "saturday": {
+    "focus": "Descanso",
+    "exercises": []
+  },
+  "sunday": {
+    "focus": "Descanso",
+    "exercises": []
+  }
+}
