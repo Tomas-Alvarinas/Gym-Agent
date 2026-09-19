@@ -12,7 +12,7 @@ from langgraph.prebuilt import ToolNode, tools_condition
 
 from config import get_llm
 from prompts.system_prompt import SYSTEM_PROMPT
-from tools.workout_tools import TOOLS
+from tools import TOOLS
 
 
 def build_graph():

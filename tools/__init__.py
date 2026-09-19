@@ -1,0 +1,5 @@
+"""Agrega todas las tools del agente en una sola lista."""
+from tools.exercise_tools import TOOLS as _EXERCISE_TOOLS
+from tools.workout_tools import TOOLS as _WORKOUT_TOOLS
+
+TOOLS = _WORKOUT_TOOLS + _EXERCISE_TOOLS
