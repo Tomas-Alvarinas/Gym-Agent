@@ -24,7 +24,7 @@ def main():
         messages = result["messages"]
 
         last_message = messages[-1]
-        print(f"Gym Agent: {last_message.content}\n")
+        print(f"Gym Agent: {last_message.text}\n")
 
 
 if __name__ == "__main__":
