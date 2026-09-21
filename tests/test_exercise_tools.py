@@ -118,7 +118,8 @@ def test_log_exercise_without_date_uses_today():
     assert f"({today})" in result
 
     history = get_exercise_history.invoke({"exercise": "Remo sin fecha"})
-    assert f"- {today}:" in history
+    assert "session_id=" in history
+    assert f"] {today}:" in history
 
 
 def test_log_exercise_with_explicit_valid_date():
@@ -134,7 +135,8 @@ def test_log_exercise_with_explicit_valid_date():
     assert "Registrado: Sentadilla con fecha (2026-01-15)" in result
 
     history = get_exercise_history.invoke({"exercise": "Sentadilla con fecha"})
-    assert "- 2026-01-15: 80.0 kg, 10 reps" in history
+    assert "session_id=" in history
+    assert "] 2026-01-15: 80.0 kg, 10 reps" in history
 
 
 def test_log_exercise_with_invalid_date_is_rejected():
@@ -300,6 +302,265 @@ def test_get_exercise_history_multiple_sessions_ordered_desc():
     assert len(lines) == 2
     assert "50.0 kg" in lines[0]  # la mas reciente (hoy) va primero
     assert "2020-01-01" in lines[1]
+
+
+def _get_latest_session_id(exercise: str) -> int:
+    """Ayuda de test: obtiene el session_id mas reciente de un ejercicio
+    directamente de la capa de datos (no parseando el texto de la tool).
+    """
+    from data.exercise_logs import fetch_exercise_history
+
+    sessions = fetch_exercise_history(exercise)
+    return sessions[0]["session_id"]
+
+
+# --- update_exercise_session ------------------------------------------------
+
+
+def test_update_exercise_session_updates_weight_and_reps():
+    from tools.exercise_tools import get_exercise_history, log_exercise, update_exercise_session
+
+    log_exercise.invoke({"exercise": "Press banca update", "sets": [{"reps": 8, "weight_kg": 80}]})
+    session_id = _get_latest_session_id("Press banca update")
+
+    result = update_exercise_session.invoke(
+        {"session_id": session_id, "sets": [{"reps": 5, "weight_kg": 100}]}
+    )
+    assert "actualizada" in result
+    assert str(session_id) in result
+
+    history = get_exercise_history.invoke({"exercise": "Press banca update"})
+    assert "100.0 kg, 5 reps" in history
+    assert "80.0 kg, 8 reps" not in history
+
+
+def test_update_exercise_session_updates_date():
+    from tools.exercise_tools import get_exercise_history, log_exercise, update_exercise_session
+
+    log_exercise.invoke(
+        {"exercise": "Remo update fecha", "sets": [{"reps": 10}], "date": "2026-01-01"}
+    )
+    session_id = _get_latest_session_id("Remo update fecha")
+
+    result = update_exercise_session.invoke({"session_id": session_id, "date": "2026-02-02"})
+    assert "actualizada" in result
+
+    history = get_exercise_history.invoke({"exercise": "Remo update fecha"})
+    assert "2026-02-02" in history
+    assert "2026-01-01" not in history
+
+
+def test_update_exercise_session_preserves_unspecified_fields():
+    from tools.exercise_tools import get_exercise_history, log_exercise, update_exercise_session
+
+    log_exercise.invoke(
+        {
+            "exercise": "Curl update parcial",
+            "sets": [{"reps": 10, "weight_kg": 12}],
+            "date": "2026-03-03",
+        }
+    )
+    session_id = _get_latest_session_id("Curl update parcial")
+
+    # Solo se actualiza exercise; date y sets no deberian cambiar.
+    result = update_exercise_session.invoke(
+        {"session_id": session_id, "exercise": "Curl update parcial renombrado"}
+    )
+    assert "actualizada" in result
+
+    history_old_name = get_exercise_history.invoke({"exercise": "Curl update parcial"})
+    assert "No hay registros" in history_old_name
+
+    history_new_name = get_exercise_history.invoke(
+        {"exercise": "Curl update parcial renombrado"}
+    )
+    assert "2026-03-03" in history_new_name
+    assert "12.0 kg, 10 reps" in history_new_name
+
+
+def test_update_exercise_session_preserves_exact_estimated_unknown_states():
+    from tools.exercise_tools import get_exercise_history, log_exercise, update_exercise_session
+
+    log_exercise.invoke(
+        {
+            "exercise": "Sentadilla update estados",
+            "sets": [
+                {"reps": 10, "weight_kg": 80},
+                {
+                    "reps": 8,
+                    "reps_is_estimated": True,
+                    "weight_kg": 85,
+                    "weight_is_estimated": True,
+                },
+                {"reps": None, "weight_kg": None},
+            ],
+        }
+    )
+    session_id = _get_latest_session_id("Sentadilla update estados")
+
+    # Se actualiza solo la fecha; los sets y sus estados no deberian tocarse.
+    update_exercise_session.invoke({"session_id": session_id, "date": "2026-04-04"})
+
+    history = get_exercise_history.invoke({"exercise": "Sentadilla update estados"})
+    assert "80.0 kg, 10 reps" in history
+    assert "~85.0 kg, ~8 reps" in history
+    assert "peso desconocido, reps desconocidas" in history
+
+
+def test_update_exercise_session_nonexistent_id_does_not_modify_data():
+    from tools.exercise_tools import get_exercise_history, update_exercise_session
+
+    result = update_exercise_session.invoke({"session_id": 999999, "exercise": "No existe"})
+    assert "No se pudo actualizar" in result
+    assert "999999" in result
+
+    history = get_exercise_history.invoke({"exercise": "No existe"})
+    assert "No hay registros" in history
+
+
+def test_update_exercise_session_invalid_date_does_not_modify_data():
+    from tools.exercise_tools import get_exercise_history, log_exercise, update_exercise_session
+
+    log_exercise.invoke(
+        {
+            "exercise": "Peso muerto update invalido",
+            "sets": [{"reps": 5, "weight_kg": 100}],
+            "date": "2026-05-05",
+        }
+    )
+    session_id = _get_latest_session_id("Peso muerto update invalido")
+
+    result = update_exercise_session.invoke({"session_id": session_id, "date": "31/05/2026"})
+    assert "No se pudo actualizar" in result
+
+    history = get_exercise_history.invoke({"exercise": "Peso muerto update invalido"})
+    assert "2026-05-05" in history  # sin cambios
+    assert "100.0 kg, 5 reps" in history  # sets sin cambios
+
+
+def test_update_exercise_session_invalid_sets_does_not_partially_modify():
+    from tools.exercise_tools import get_exercise_history, log_exercise, update_exercise_session
+
+    log_exercise.invoke(
+        {"exercise": "Fondos update invalido", "sets": [{"reps": 10, "weight_kg": 0}]}
+    )
+    session_id = _get_latest_session_id("Fondos update invalido")
+
+    result = update_exercise_session.invoke(
+        {
+            "session_id": session_id,
+            "sets": [{"reps": 10, "weight_kg": 5}, {"reps": 0, "weight_kg": 5}],
+        }
+    )
+    assert "No se pudo actualizar" in result
+    assert "serie 2" in result
+
+    history = get_exercise_history.invoke({"exercise": "Fondos update invalido"})
+    # La sesion debe conservar exactamente su unica serie original, no las
+    # nuevas ni una mezcla parcial.
+    assert history.count("reps") == 1
+    assert "0.0 kg, 10 reps" in history
+
+
+# --- delete_exercise_session --------------------------------------------------
+
+
+def test_delete_exercise_session_removes_session():
+    from tools.exercise_tools import delete_exercise_session, get_exercise_history, log_exercise
+
+    log_exercise.invoke({"exercise": "Plancha delete", "sets": [{"reps": 30}]})
+    session_id = _get_latest_session_id("Plancha delete")
+
+    result = delete_exercise_session.invoke({"session_id": session_id})
+    assert "eliminada" in result
+    assert str(session_id) in result
+
+    history = get_exercise_history.invoke({"exercise": "Plancha delete"})
+    assert "No hay registros" in history
+
+
+def test_delete_exercise_session_removes_associated_sets():
+    from data.db import get_connection
+    from tools.exercise_tools import delete_exercise_session, log_exercise
+
+    log_exercise.invoke(
+        {"exercise": "Remo delete sets", "sets": [{"reps": 10}, {"reps": 8}, {"reps": 6}]}
+    )
+    session_id = _get_latest_session_id("Remo delete sets")
+
+    delete_exercise_session.invoke({"session_id": session_id})
+
+    conn = get_connection()
+    try:
+        remaining = conn.execute(
+            "SELECT COUNT(*) AS n FROM exercise_sets WHERE session_id = ?",
+            (session_id,),
+        ).fetchone()["n"]
+    finally:
+        conn.close()
+    assert remaining == 0
+
+
+def test_delete_exercise_session_does_not_affect_other_sessions():
+    from tools.exercise_tools import delete_exercise_session, get_exercise_history, log_exercise
+
+    log_exercise.invoke(
+        {"exercise": "Dominadas delete", "sets": [{"reps": 6}], "date": "2026-06-01"}
+    )
+    session_id_to_delete = _get_latest_session_id("Dominadas delete")
+    log_exercise.invoke(
+        {"exercise": "Dominadas delete", "sets": [{"reps": 8}], "date": "2026-06-02"}
+    )
+    session_id_to_keep = _get_latest_session_id("Dominadas delete")
+
+    delete_exercise_session.invoke({"session_id": session_id_to_delete})
+
+    history = get_exercise_history.invoke({"exercise": "Dominadas delete"})
+    assert "2026-06-02" in history
+    assert "2026-06-01" not in history
+    assert str(session_id_to_keep) in history
+
+
+def test_delete_exercise_session_nonexistent_id_does_not_modify_data():
+    from tools.exercise_tools import delete_exercise_session, get_exercise_history, log_exercise
+
+    log_exercise.invoke({"exercise": "Zancadas delete inexistente", "sets": [{"reps": 12}]})
+
+    result = delete_exercise_session.invoke({"session_id": 999999})
+    assert "No se pudo eliminar" in result
+    assert "999999" in result
+
+    history = get_exercise_history.invoke({"exercise": "Zancadas delete inexistente"})
+    assert "12 reps" in history
+
+
+# --- historial expone session_id utilizable --------------------------------
+
+
+def test_get_exercise_history_exposes_usable_session_id():
+    import re
+
+    from tools.exercise_tools import (
+        delete_exercise_session,
+        get_exercise_history,
+        log_exercise,
+        update_exercise_session,
+    )
+
+    log_exercise.invoke({"exercise": "Jalon historial id", "sets": [{"reps": 10, "weight_kg": 40}]})
+    history = get_exercise_history.invoke({"exercise": "Jalon historial id"})
+
+    match = re.search(r"session_id=(\d+)", history)
+    assert match is not None, "get_exercise_history debe exponer un session_id identificable"
+    session_id = int(match.group(1))
+
+    update_result = update_exercise_session.invoke(
+        {"session_id": session_id, "date": "2026-07-07"}
+    )
+    assert "actualizada" in update_result
+
+    delete_result = delete_exercise_session.invoke({"session_id": session_id})
+    assert "eliminada" in delete_result
 
 
 if __name__ == "__main__":
