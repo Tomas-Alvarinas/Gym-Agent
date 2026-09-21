@@ -108,6 +108,80 @@ def test_log_exercise_mixed_estimation_across_sets():
     assert "peso desconocido, 4 reps" in result
 
 
+def test_log_exercise_without_date_uses_today():
+    from datetime import date as date_cls
+
+    from tools.exercise_tools import get_exercise_history, log_exercise
+
+    today = date_cls.today().isoformat()
+    result = log_exercise.invoke({"exercise": "Remo sin fecha", "sets": [{"reps": 10}]})
+    assert f"({today})" in result
+
+    history = get_exercise_history.invoke({"exercise": "Remo sin fecha"})
+    assert f"- {today}:" in history
+
+
+def test_log_exercise_with_explicit_valid_date():
+    from tools.exercise_tools import get_exercise_history, log_exercise
+
+    result = log_exercise.invoke(
+        {
+            "exercise": "Sentadilla con fecha",
+            "sets": [{"reps": 10, "weight_kg": 80}],
+            "date": "2026-01-15",
+        }
+    )
+    assert "Registrado: Sentadilla con fecha (2026-01-15)" in result
+
+    history = get_exercise_history.invoke({"exercise": "Sentadilla con fecha"})
+    assert "- 2026-01-15: 80.0 kg, 10 reps" in history
+
+
+def test_log_exercise_with_invalid_date_is_rejected():
+    from tools.exercise_tools import log_exercise
+
+    result = log_exercise.invoke(
+        {
+            "exercise": "Sentadilla",
+            "sets": [{"reps": 10}],
+            "date": "15/01/2026",
+        }
+    )
+    assert "No se pudo registrar" in result
+    assert "date" in result
+
+
+def test_log_exercise_with_semantically_invalid_date_is_rejected():
+    from tools.exercise_tools import log_exercise
+
+    result = log_exercise.invoke(
+        {
+            "exercise": "Sentadilla",
+            "sets": [{"reps": 10}],
+            "date": "2026-13-40",
+        }
+    )
+    assert "No se pudo registrar" in result
+    assert "date" in result
+
+
+def test_log_exercise_with_non_dashed_iso_date_is_rejected():
+    # date.fromisoformat en Python 3.11+ acepta variantes ISO como
+    # "20260115" o fechas de semana; el contrato de esta tool exige
+    # YYYY-MM-DD estricto, sin ambiguedad.
+    from tools.exercise_tools import log_exercise
+
+    result = log_exercise.invoke(
+        {
+            "exercise": "Sentadilla",
+            "sets": [{"reps": 10}],
+            "date": "20260115",
+        }
+    )
+    assert "No se pudo registrar" in result
+    assert "date" in result
+
+
 def test_log_exercise_missing_name():
     from tools.exercise_tools import log_exercise
 
