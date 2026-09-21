@@ -108,18 +108,41 @@ def test_log_exercise_mixed_estimation_across_sets():
     assert "peso desconocido, 4 reps" in result
 
 
-def test_log_exercise_without_date_uses_today():
+def test_log_exercise_without_date_uses_argentina_today():
+    # Fecha fija e inyectada (no el reloj real): parchea el nombre
+    # importado en tools.exercise_tools, igual que el resto del
+    # proyecto parchea data.db.DB_PATH para aislar SQLite. log_exercise
+    # no necesita ningun cambio de API para ser testeable asi.
     from datetime import date as date_cls
+    from unittest.mock import patch
 
     from tools.exercise_tools import get_exercise_history, log_exercise
 
-    today = date_cls.today().isoformat()
-    result = log_exercise.invoke({"exercise": "Remo sin fecha", "sets": [{"reps": 10}]})
-    assert f"({today})" in result
+    fixed_today = date_cls(2030, 6, 15)
+    with patch("tools.exercise_tools.today_in_argentina", return_value=fixed_today):
+        result = log_exercise.invoke({"exercise": "Remo sin fecha", "sets": [{"reps": 10}]})
+    assert "(2030-06-15)" in result
 
     history = get_exercise_history.invoke({"exercise": "Remo sin fecha"})
     assert "session_id=" in history
-    assert f"] {today}:" in history
+    assert "] 2030-06-15:" in history
+
+
+def test_log_exercise_without_date_delegates_to_today_in_argentina_not_real_clock():
+    # Dos fechas inyectadas distintas -> dos resultados distintos, sin
+    # importar que dia sea realmente cuando corre el test.
+    from datetime import date as date_cls
+    from unittest.mock import patch
+
+    from tools.exercise_tools import log_exercise
+
+    with patch("tools.exercise_tools.today_in_argentina", return_value=date_cls(2031, 1, 1)):
+        result_a = log_exercise.invoke({"exercise": "Remo delega A", "sets": [{"reps": 10}]})
+    with patch("tools.exercise_tools.today_in_argentina", return_value=date_cls(2031, 1, 2)):
+        result_b = log_exercise.invoke({"exercise": "Remo delega B", "sets": [{"reps": 10}]})
+
+    assert "(2031-01-01)" in result_a
+    assert "(2031-01-02)" in result_b
 
 
 def test_log_exercise_with_explicit_valid_date():
