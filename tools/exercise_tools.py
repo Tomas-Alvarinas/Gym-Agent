@@ -5,8 +5,11 @@ al menos una serie son obligatorios. Por serie, reps y weight_kg son
 ambos opcionales (un registro parcial sigue siendo válido: "hice 3
 series pero no recuerdo peso ni reps"). Cada uno puede marcarse como
 estimado, pero solo si tiene un valor: no se puede marcar como estimado
-un dato desconocido (null). La date la asigna el sistema (hoy), nunca la
-recibe como parámetro ni la decide el LLM.
+un dato desconocido (null). La date es opcional: si no se indica, el
+sistema asigna el día actual; si se indica, debe venir en formato
+YYYY-MM-DD estricto (se valida y se rechaza cualquier otro formato,
+aunque sea un ISO 8601 válido en otra variante, como fechas de semana
+o formato sin guiones).
 
 Nota: el código valida consistencia estructural (si está marcado como
 estimado, tiene que tener valor), pero no puede verificar que una
@@ -14,12 +17,15 @@ estimación realmente provino del usuario y no fue inventada por el
 agente -- eso depende de cómo el LLM decide llamar a esta tool, que es
 una decisión de prompt engineering, no de esta capa.
 """
+import re
 from datetime import date as date_cls
 
 from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 
 from data.exercise_logs import fetch_exercise_history, insert_exercise_log
+
+_ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
 class ExerciseSet(BaseModel):
@@ -60,8 +66,8 @@ def _format_set(s: dict) -> str:
 
 
 @tool
-def log_exercise(exercise: str, sets: list[ExerciseSet]) -> str:
-    """Registra un ejercicio realizado hoy, con el detalle de cada serie individual.
+def log_exercise(exercise: str, sets: list[ExerciseSet], date: str | None = None) -> str:
+    """Registra un ejercicio realizado, con el detalle de cada serie individual.
 
     Cada elemento de 'sets' representa una serie. reps y weight_kg son
     ambos opcionales -- un registro parcial (ej. series sin recordar
@@ -69,12 +75,23 @@ def log_exercise(exercise: str, sets: list[ExerciseSet]) -> str:
     reps_is_estimated marcan si ese valor es una estimación en vez de un
     dato exacto; no pueden ser True si el valor correspondiente es
     desconocido. La cantidad de series es la cantidad de elementos de
-    'sets'. La fecha se asigna automáticamente al día actual.
+    'sets'. 'date' es opcional en formato YYYY-MM-DD; si no se indica,
+    se usa el día actual.
     """
     if not exercise or not exercise.strip():
         return "No se pudo registrar: falta el nombre del ejercicio."
     if not sets:
         return "No se pudo registrar: se necesita al menos una serie en 'sets'."
+
+    if date is None:
+        resolved_date = date_cls.today().isoformat()
+    elif not _ISO_DATE_RE.match(date):
+        return f"No se pudo registrar: 'date' inválida ('{date}'). Debe tener formato YYYY-MM-DD."
+    else:
+        try:
+            resolved_date = date_cls.fromisoformat(date).isoformat()
+        except ValueError:
+            return f"No se pudo registrar: 'date' inválida ('{date}'). Debe tener formato YYYY-MM-DD."
 
     for i, s in enumerate(sets, start=1):
         if s.reps is not None and s.reps <= 0:
@@ -87,7 +104,6 @@ def log_exercise(exercise: str, sets: list[ExerciseSet]) -> str:
             return f"No se pudo registrar: la serie {i} marca 'weight_kg' como estimado pero no tiene valor."
 
     exercise = exercise.strip()
-    today = date_cls.today().isoformat()
     sets_data = [
         {
             "reps": s.reps,
@@ -97,9 +113,9 @@ def log_exercise(exercise: str, sets: list[ExerciseSet]) -> str:
         }
         for s in sets
     ]
-    insert_exercise_log(exercise, sets_data, today)
+    insert_exercise_log(exercise, sets_data, resolved_date)
 
-    lines = [f"Registrado: {exercise} ({today})"]
+    lines = [f"Registrado: {exercise} ({resolved_date})"]
     for s in sets_data:
         lines.append(f"- {_format_set(s)}")
     return "\n".join(lines)
