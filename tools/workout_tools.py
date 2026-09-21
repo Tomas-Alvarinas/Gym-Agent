@@ -5,11 +5,10 @@ qué se considera "hoy" y qué se devuelve si es día de descanso o si no
 hay rutina cargada, NO lo decide el LLM. La tool siempre devuelve datos
 reales o un mensaje explícito de "no hay información" — nunca inventa.
 """
-from datetime import datetime
-
 from langchain_core.tools import tool
 
 from data.store import get_routine_for_day
+from date_utils import today_in_argentina
 
 _WEEKDAYS = [
     "monday",
@@ -28,7 +27,7 @@ def get_today_workout() -> str:
 
     Usar esta tool cuando el usuario pregunte qué le toca entrenar hoy.
     """
-    day_name = _WEEKDAYS[datetime.now().weekday()]
+    day_name = _WEEKDAYS[today_in_argentina().weekday()]
     routine = get_routine_for_day(day_name)
 
     if routine is None:

@@ -38,6 +38,7 @@ from data.exercise_logs import (
     insert_exercise_log,
     update_session_record,
 )
+from date_utils import today_in_argentina
 
 _ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
@@ -138,7 +139,7 @@ def log_exercise(exercise: str, sets: list[ExerciseSet], date: str | None = None
         return "No se pudo registrar: se necesita al menos una serie en 'sets'."
 
     if date is None:
-        resolved_date = date_cls.today().isoformat()
+        resolved_date = today_in_argentina().isoformat()
     else:
         resolved_date = _validate_iso_date(date)
         if resolved_date is None:
