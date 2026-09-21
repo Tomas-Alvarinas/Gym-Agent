@@ -35,7 +35,8 @@ CREATE TABLE IF NOT EXISTS reminders (
     weekdays TEXT,
     timezone TEXT NOT NULL DEFAULT 'America/Argentina/Buenos_Aires',
     is_active INTEGER NOT NULL DEFAULT 1,
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    last_triggered_at TEXT
 );
 """
 

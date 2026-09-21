@@ -32,6 +32,7 @@ def _row_to_reminder(row) -> dict:
         "timezone": row["timezone"],
         "is_active": bool(row["is_active"]),
         "created_at": row["created_at"],
+        "last_triggered_at": row["last_triggered_at"],
     }
 
 
@@ -130,5 +131,23 @@ def delete_reminder_record(reminder_id: int, db_path: Path | None = None) -> boo
         cursor = conn.execute("DELETE FROM reminders WHERE id = ?", (reminder_id,))
         conn.commit()
         return cursor.rowcount > 0
+    finally:
+        conn.close()
+
+
+def mark_reminder_triggered(
+    reminder_id: int, triggered_at: str, db_path: Path | None = None
+) -> None:
+    """Registra el instante (ISO, timezone-aware) del último envío EXITOSO
+    de este reminder. Solo debe llamarse después de que Telegram confirme
+    el envío -- nunca antes, y nunca si el envío falló.
+    """
+    conn = get_connection(db_path)
+    try:
+        conn.execute(
+            "UPDATE reminders SET last_triggered_at = ? WHERE id = ?",
+            (triggered_at, reminder_id),
+        )
+        conn.commit()
     finally:
         conn.close()

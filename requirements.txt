@@ -5,3 +5,4 @@ python-dotenv>=1.0
 pydantic>=2
 pytest>=8
 tzdata>=2024.1
+requests>=2.31
