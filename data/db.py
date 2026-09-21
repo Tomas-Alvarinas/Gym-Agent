@@ -38,6 +38,20 @@ CREATE TABLE IF NOT EXISTS reminders (
     created_at TEXT NOT NULL,
     last_triggered_at TEXT
 );
+
+CREATE TABLE IF NOT EXISTS exercise_goals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    exercise TEXT NOT NULL,
+    target_weight_kg REAL NOT NULL,
+    target_reps INTEGER NOT NULL,
+    target_date TEXT,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_one_active_goal_per_exercise
+ON exercise_goals(exercise COLLATE NOCASE)
+WHERE is_active = 1;
 """
 
 
