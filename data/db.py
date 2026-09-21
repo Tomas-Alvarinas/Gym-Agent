@@ -41,6 +41,18 @@ CREATE TABLE IF NOT EXISTS reminders (
 """
 
 
+def _ensure_column(conn: sqlite3.Connection, table: str, column: str, column_def: str) -> None:
+    """Migración idempotente: agrega 'column' a 'table' si todavía no
+    existe (ej. una DB creada por una versión anterior de la app, donde
+    CREATE TABLE IF NOT EXISTS no toca la tabla ya existente). No hace
+    nada si la columna ya está -- seguro de llamar en cada conexión.
+    """
+    existing_columns = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
+    if column not in existing_columns:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {column_def}")
+        conn.commit()
+
+
 def get_connection(db_path: Path | None = None) -> sqlite3.Connection:
     if db_path is None:
         db_path = DB_PATH
@@ -48,4 +60,5 @@ def get_connection(db_path: Path | None = None) -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     conn.executescript(_SCHEMA)
+    _ensure_column(conn, "reminders", "last_triggered_at", "TEXT")
     return conn
