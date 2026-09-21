@@ -25,6 +25,18 @@ CREATE TABLE IF NOT EXISTS exercise_sets (
     weight_kg REAL,
     weight_is_estimated INTEGER NOT NULL DEFAULT 0
 );
+
+CREATE TABLE IF NOT EXISTS reminders (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    message TEXT NOT NULL,
+    category TEXT,
+    time TEXT NOT NULL,
+    recurrence_type TEXT NOT NULL,
+    weekdays TEXT,
+    timezone TEXT NOT NULL DEFAULT 'America/Argentina/Buenos_Aires',
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL
+);
 """
 
 
